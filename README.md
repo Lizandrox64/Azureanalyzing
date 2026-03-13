@@ -56,8 +56,3 @@ Este dashboard convierte tus archivos CSV de autenticación de Azure Active Dire
 
 ## 🚀 Inicio Rápido
 
-### 1️⃣ Descarga el dashboard
-
-```bash
-git clone https://github.com/tuusuario/azure-ad-auth-analytics.git
-cd azure-ad-auth-analytics
