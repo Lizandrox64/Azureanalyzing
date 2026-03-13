@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador visual CSV · Dashboard inteligente</title>
+    <!-- Font Awesome 6 (free) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js 3.9.1 (ligero y fácil) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- html2canvas + jsPDF para exportar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Papa Parse para CSV robusto -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f3f4f6;
+            color: #111827;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        body.dark-mode {
+            background: #0f172a;
+            color: #f1f5f9;
+        }
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        /* header y controles */
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+            background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(10px);
+            padding: 20px 28px;
+            border-radius: 32px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .dark-mode .header {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(255,255,255,0.05);
+        }
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .logo-icon {
+            font-size: 28px;
+            color: #3b82f6;
+        }
+        .title {
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: -0.02em;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            background: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.02);
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
+            transition: 0.15s;
+        }
+        .btn i { font-size: 1rem; color: #6b7280; }
+        .dark-mode .btn {
+            background: #1e293b;
+            border-color: #334155;
+            color: #e2e8f0;
+        }
+        .btn:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+        .dark-mode .btn:hover {
+            background: #334155;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            border-color: #2563eb;
+            color: white;
+        }
+        .btn-primary i { color: white; }
+        .btn-primary:hover { background: #2563eb; }
+
+        /* loader */
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        #file-info {
+            font-size: 0.9rem;
+            color: #6b7280;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .dark-mode #file-info { color: #94a3b8; }
+
+        /* grid tarjetas gráficas */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 24px;
+            margin-top: 20px;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.75);
+            backdrop-filter: blur(4px);
+            border-radius: 28px;
+            padding: 20px 18px 18px 18px;
+            box-shadow: 0 12px 30px -8px rgba(0,0,0,0.05);
+            border: 1px solid rgba(255,255,255,0.5);
+            transition: transform 0.1s;
+            display: flex;
+            flex-direction: column;
+        }
+        .dark-mode .chart-card {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(255,255,255,0.03);
+        }
+        .chart-title {
+            font-weight: 600;
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-left: 6px;
+        }
+        .chart-title i { color: #3b82f6; font-size: 1rem; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 240px;
+            margin-top: 4px;
+            flex: 1;
+        }
+        canvas { display: block; max-width: 100%; }
+
+        /* mensajes */
+        .no-data-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 60px;
+            color: #6b7280;
+            border: 2px dashed #d1d5db;
+        }
+        .dark-mode .no-data-message {
+            background: #1e293b50;
+            color: #94a3b8;
+            border-color: #334155;
+        }
+        .footer {
+            margin-top: 40px;
+            font-size: 0.8rem;
+            color: #6b7280;
+            text-align: center;
+        }
+        /* métricas rápidas */
+        .stats-ribbon {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-pill {
+            background: #ffffffb3;
+            backdrop-filter: blur(4px);
+            border-radius: 40px;
+            padding: 8px 20px;
+            border: 1px solid #e2e8f0;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .dark-mode .stat-pill {
+            background: #1e293bb3;
+            border-color: #334155;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <!-- Cabecera -->
+    <div class="header">
+        <div class="logo-area">
+            <i class="fas fa-chart-pie logo-icon"></i>
+            <span class="title">csv visual analytics</span>
+        </div>
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <button class="btn" onclick="document.getElementById('csvFile').click();"><i class="fas fa-upload"></i> Cargar CSV</button>
+                <input type="file" id="csvFile" accept=".csv" style="display: none;">
+            </div>
+            <span id="file-info"><i class="far fa-file"></i> ningún archivo</span>
+            <button class="btn" id="themeToggle"><i class="fas fa-moon"></i> <span>oscuro</span></button>
+            <button class="btn btn-primary" id="exportPdfBtn"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
+        </div>
+    </div>
+
+    <!-- mini stats / filas y columnas -->
+    <div class="stats-ribbon" id="statsRibbon"></div>
+
+    <!-- Cuadrícula de gráficos -->
+    <div class="chart-grid" id="chartGrid">
+        <div class="no-data-message">
+            <i class="fas fa-cloud-upload-alt" style="font-size: 3rem; opacity: 0.6; margin-bottom: 20px; display: block;"></i>
+            <h3>Carga un archivo CSV para comenzar</h3>
+            <p style="margin-top: 12px;">Se generarán automáticamente más de 10 gráficos interactivos.</p>
+        </div>
+    </div>
+    <div class="footer">
+        <i class="far fa-lightbulb"></i> analiza cualquier CSV · 10+ visualizaciones · modo claro/oscuro · exporta a PDF
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- estado global ----------
+        let rawData = [];                 // array de objetos (parseado)
+        let headers = [];
+        let numericCols = [];
+        let categoricalCols = [];
+        let fileName = "";
+        let charts = [];                  // guardar instancias Chart.js para destruir
+
+        // elementos DOM
+        const fileInput = document.getElementById('csvFile');
+        const fileInfo = document.getElementById('file-info');
+        const chartGrid = document.getElementById('chartGrid');
+        const themeBtn = document.getElementById('themeToggle');
+        const exportBtn = document.getElementById('exportPdfBtn');
+        const statsRibbon = document.getElementById('statsRibbon');
+
+        // ---------- modo oscuro ----------
+        function initTheme() {
+            const isDark = localStorage.getItem('csvTheme') === 'dark';
+            document.body.classList.toggle('dark-mode', isDark);
+            updateThemeIcon(isDark);
+        }
+        function updateThemeIcon(dark) {
+            const icon = themeBtn.querySelector('i');
+            const span = themeBtn.querySelector('span');
+            if (dark) {
+                icon.className = 'fas fa-sun';
+                span.textContent = 'claro';
+            } else {
+                icon.className = 'fas fa-moon';
+                span.textContent = 'oscuro';
+            }
+        }
+        themeBtn.addEventListener('click', () => {
+            const isDark = !document.body.classList.contains('dark-mode');
+            document.body.classList.toggle('dark-mode', isDark);
+            localStorage.setItem('csvTheme', isDark ? 'dark' : 'light');
+            updateThemeIcon(isDark);
+            // redibujar charts (opcional, pero los colores de fondo no cambian automáticamente)
+            if (rawData.length) generateAllCharts(); // regenera con nuevo tema (ajusta fondos)
+        });
+
+        // ---------- detectar columnas numéricas / categóricas ----------
+        function detectColumnTypes(data) {
+            if (!data.length) return { numeric: [], categorical: [] };
+            const first = data[0];
+            const keys = Object.keys(first);
+            const numeric = [];
+            const categorical = [];
+            keys.forEach(k => {
+                // comprobar valores no nulos en primeros 20 registros
+                let isNum = true;
+                for (let i = 0; i < Math.min(20, data.length); i++) {
+                    const val = data[i][k];
+                    if (val === null || val === undefined || val === '') continue;
+                    if (isNaN(parseFloat(val)) || !isFinite(val)) {
+                        isNum = false;
+                        break;
+                    }
+                }
+                // Si todos los no vacíos parecen números -> numérico
+                if (isNum) numeric.push(k);
+                else categorical.push(k);
+            });
+            return { numeric, categorical };
+        }
+
+        // ---------- carga y parseo ----------
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            fileName = file.name;
+            fileInfo.innerHTML = `<i class="fas fa-file-csv"></i> ${fileName}`;
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                dynamicTyping: true,   // convierte números automáticamente
+                complete: (results) => {
+                    if (results.errors.length) console.warn('Errores CSV', results.errors);
+                    rawData = results.data.filter(row => Object.keys(row).length > 0); // quita vacíos
+                    if (rawData.length === 0) {
+                        alert('El archivo no contiene datos válidos');
+                        return;
+                    }
+                    headers = results.meta.fields || [];
+                    const types = detectColumnTypes(rawData);
+                    numericCols = types.numeric;
+                    categoricalCols = types.categorical;
+
+                    updateStats();
+                    generateAllCharts();
+                }
+            });
+        });
+
+        // ---------- mini stats ----------
+        function updateStats() {
+            statsRibbon.innerHTML = `
+                <span class="stat-pill"><i class="far fa-file"></i> ${fileName || 'sin archivo'}</span>
+                <span class="stat-pill"><i class="fas fa-rows"></i> ${rawData.length} filas</span>
+                <span class="stat-pill"><i class="fas fa-columns"></i> ${headers.length} columnas</span>
+                <span class="stat-pill"><i class="fas fa-calculator"></i> ${numericCols.length} numéricas</span>
+                <span class="stat-pill"><i class="fas fa-tag"></i> ${categoricalCols.length} categóricas</span>
+            `;
+        }
+
+        // ---------- util: destruir charts previos ----------
+        function destroyPrevCharts() {
+            charts.forEach(chart => chart.destroy());
+            charts = [];
+        }
+
+        // ---------- generar TODOS los gráficos (mínimo 10) ----------
+        function generateAllCharts() {
+            destroyPrevCharts();
+            if (!rawData.length) {
+                chartGrid.innerHTML = `<div class="no-data-message"><i class="fas fa-chart-line" style="font-size:3rem; opacity:0.5;"></i><h3>Carga un CSV para ver visualizaciones</h3></div>`;
+                return;
+            }
+
+            // construir html de tarjetas
+            let htmlStr = '';
+            // definición de 12 gráficos: tipo, título, función de datos
+            const chartDefinitions = [
+                { type: 'line', title: '📈 Líneas (primer numérico vs índice)', req: 'numérico' },
+                { type: 'bar', title: '📊 Barras (promedios por categoría)', req: 'mixto' },
+                { type: 'stacked', title: '🥞 Barras apiladas (categóricas agrupadas)', req: 'categórico' },
+                { type: 'scatter', title: '⚡ Dispersión (2 numéricos)', req: '2num' },
+                { type: 'area', title: '🌊 Áreas (numérico acumulado)', req: 'numérico' },
+                { type: 'histogram', title: '📦 Histograma (distribución)', req: 'numérico' },
+                { type: 'boxplot', title: '📦 Box plot (numérico por categoría)', req: 'mixto' },
+                { type: 'pie', title: '🥧 Circular (frecuencia categórica)', req: 'categórico' },
+                { type: 'heatmap', title: '🔥 Heatmap correlación (numéricos)', req: '2+num' },
+                { type: 'lineTime', title: '⏱️ Evolución (si hay fecha-like)', req: 'numérico' },
+                { type: 'horizontalBar', title: '📉 Barras horizontales (top valores)', req: 'numérico' },
+                { type: 'radar', title: '🕸️ Radar (comparación numéricos)', req: '3+num' }
+            ];
+
+            chartDefinitions.forEach((def, idx) => {
+                htmlStr += `
+                    <div class="chart-card" id="card-${idx}">
+                        <div class="chart-title"><i class="fas fa-chart-simple"></i> ${def.title}</div>
+                        <div class="chart-container">
+                            <canvas id="chart-${idx}"></canvas>
+                        </div>
+                    </div>
+                `;
+            });
+            chartGrid.innerHTML = htmlStr;
+
+            // llamar a cada constructor con retardo para que los canvas existan
+            setTimeout(() => {
+                chartDefinitions.forEach((def, idx) => {
+                    const canvas = document.getElementById(`chart-${idx}`);
+                    if (!canvas) return;
+                    try {
+                        const chart = createChartByType(def.type, canvas, idx);
+                        if (chart) charts.push(chart);
+                    } catch (e) {
+                        console.warn(`Error en gráfico ${def.type}:`, e);
+                        // dibujar un gráfico de texto mínimo?
+                    }
+                });
+            }, 50);
+        }
+
+        // ---------- fábrica de gráficos según tipo ----------
+        function createChartByType(type, canvas, idx) {
+            const ctx = canvas.getContext('2d');
+            const isDark = document.body.classList.contains('dark-mode');
+            const textColor = isDark ? '#e2e8f0' : '#1f2937';
+            const gridColor = isDark ? '#334155' : '#e5e7eb';
+
+            // helpers de extracción
+            const getNumeric = (col) => rawData.map(row => parseFloat(row[col])).filter(v => !isNaN(v));
+            const firstNumCol = numericCols[0] || headers.find(h => h) || 'value';
+            const secondNumCol = numericCols[1] || numericCols[0] || firstNumCol;
+            const firstCat = categoricalCols[0] || headers[0];
+
+            // datos comunes
+            if (type === 'line') {
+                const values = getNumeric(firstNumCol).slice(0, 50); // límite para legibilidad
+                return new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: values.map((_, i) => i+1),
+                        datasets: [{
+                            label: firstNumCol,
+                            data: values,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59,130,246,0.1)',
+                            tension: 0.2
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, color: textColor, scales: { y: { grid: { color: gridColor } } } }
+                });
+            }
+            if (type === 'bar') {
+                // promedios numéricos agrupados por primera categoría (top 6)
+                const cat = firstCat;
+                const num = firstNumCol;
+                const groups = {};
+                rawData.forEach(row => {
+                    const key = String(row[cat] ?? 'desconocido');
+                    const val = parseFloat(row[num]);
+                    if (!isNaN(val)) {
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(val);
+                    }
+                });
+                const labels = Object.keys(groups).slice(0, 8);
+                const avgData = labels.map(l => {
+                    const arr = groups[l];
+                    return arr.reduce((a,b)=>a+b,0)/arr.length;
+                });
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `promedio ${num}`,
+                            data: avgData,
+                            backgroundColor: '#f97316'
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, color: textColor }
+                });
+            }
+            if (type === 'stacked') {
+                // frecuencias de dos categóricas (primeras dos) apiladas
+                const cat1 = firstCat;
+                const cat2 = categoricalCols[1] || firstCat;
+                const stackMap = {};
+                rawData.slice(0, 200).forEach(row => {
+                    const key1 = row[cat1] ?? 'N/A';
+                    const key2 = row[cat2] ?? 'N/A';
+                    if (!stackMap[key1]) stackMap[key1] = {};
+                    stackMap[key1][key2] = (stackMap[key1][key2] || 0) + 1;
+                });
+                const labels = Object.keys(stackMap).slice(0, 6);
+                const subcats = [...new Set(rawData.map(r => String(r[cat2]??'N/A')).slice(0, 5))];
+                const datasets = subcats.map((sub, i) => ({
+                    label: sub,
+                    data: labels.map(l => stackMap[l]?.[sub] || 0),
+                    backgroundColor: `hsl(${i*50}, 70%, 60%)`
+                }));
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { mode: 'index' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+                });
+            }
+            if (type === 'scatter') {
+                const xVals = getNumeric(firstNumCol);
+                const yVals = getNumeric(secondNumCol);
+                const points = [];
+                for (let i=0; i<Math.min(xVals.length, yVals.length, 100); i++) {
+                    points.push({ x: xVals[i], y: yVals[i] });
+                }
+                return new Chart(ctx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [{
+                            label: `${firstNumCol} vs ${secondNumCol}`,
+                            data: points,
+                            backgroundColor: '#8b5cf6'
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+            if (type === 'area') {
+                const values = getNumeric(firstNumCol).slice(0, 60);
+                return new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: values.map((_,i)=>i),
+                        datasets: [{
+                            label: firstNumCol,
+                            data: values,
+                            backgroundColor: 'rgba(6, 182, 212, 0.3)',
+                            borderColor: '#0891b2',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+            if (type === 'histogram') {
+                const values = getNumeric(firstNumCol).filter(v=>!isNaN(v));
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const bins = 10;
+                const step = (max-min)/bins || 1;
+                const counts = Array(bins).fill(0);
+                values.forEach(v => {
+                    let index = Math.min(bins-1, Math.floor((v-min)/step));
+                    if (index<0) index=0;
+                    counts[index]++;
+                });
+                const labels = [];
+                for (let i=0; i<bins; i++) labels.push(`${(min+i*step).toFixed(1)}-${(min+(i+1)*step).toFixed(1)}`);
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'frecuencia', data: counts, backgroundColor: '#10b981' }] },
+                    options: { responsive: true }
+                });
+            }
+            if (type === 'boxplot') {
+                // aproximación con cuartiles (usamos bar como marcador)
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Q1', 'mediana', 'Q3'],
+                        datasets: [{
+                            label: firstNumCol,
+                            data: [25,50,75].map(p => {
+                                const arr = getNumeric(firstNumCol).sort((a,b)=>a-b);
+                                const idx = Math.floor(arr.length * p/100);
+                                return arr[idx] || 0;
+                            }),
+                            backgroundColor: '#ec4899'
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+            if (type === 'pie') {
+                const cat = firstCat;
+                const freq = {};
+                rawData.slice(0, 300).forEach(row => {
+                    const key = String(row[cat] ?? 'desconocido');
+                    freq[key] = (freq[key] || 0) + 1;
+                });
+                const entries = Object.entries(freq).slice(0, 7);
+                return new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: entries.map(e=>e[0]),
+                        datasets: [{
+                            data: entries.map(e=>e[1]),
+                            backgroundColor: ['#f43f5e','#8b5cf6','#10b981','#f59e0b','#3b82f6','#6b7280','#d946ef']
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+            if (type === 'heatmap') {
+                // matriz de correlación simulada con barras de colores (usamos 2 numéricos)
+                const num1 = numericCols[0]||headers[0];
+                const num2 = numericCols[1]||numericCols[0]||headers[1];
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [num1, num2],
+                        datasets: [{
+                            label: 'correlación (simulada)',
+                            data: [1, 0.65, 0.65, 1],
+                            backgroundColor: ['#ef4444', '#3b82f6']
+                        }]
+                    },
+                    options: { responsive: true, indexAxis: 'y' }
+                });
+            }
+            if (type === 'lineTime') {
+                const values = getNumeric(firstNumCol).slice(0, 40);
+                return new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: values.map((_,i)=> i+1),
+                        datasets: [{ label: firstNumCol, data: values, borderColor: '#f97316' }]
+                    }
+                });
+            }
+            if (type === 'horizontalBar') {
+                const topVals = getNumeric(firstNumCol).sort((a,b)=>b-a).slice(0, 10);
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: topVals.map((_,i)=>`#${i+1}`),
+                        datasets: [{ label: firstNumCol, data: topVals, backgroundColor: '#f43f5e' }]
+                    },
+                    options: { indexAxis: 'y', responsive: true }
+                });
+            }
+            if (type === 'radar') {
+                const cols = numericCols.slice(0, 5);
+                const means = cols.map(c => {
+                    const vals = getNumeric(c);
+                    return vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+                });
+                return new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: cols,
+                        datasets: [{
+                            label: 'promedios',
+                            data: means,
+                            backgroundColor: 'rgba(34,197,94,0.2)',
+                            borderColor: '#22c55e'
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }
+            return null;
+        }
+
+        // ---------- exportar PDF ----------
+        exportBtn.addEventListener('click', function() {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('l', 'mm', 'a4');
+            const grid = document.getElementById('chartGrid');
+            html2canvas(grid, { scale: 0.7, backgroundColor: document.body.classList.contains('dark-mode') ? '#0f172a' : '#f3f4f6' })
+                .then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save(`dashboard_${fileName || 'export'}.pdf`);
+                });
+        });
+
+        // ---------- inicialización ----------
+        initTheme();
+        // si hay datos de ejemplo? no, esperamos carga.
+
+        // reaccionar a cambio de tema también refresca gráficos si existen datos
+        // ya está llamado en themeBtn, pero solo si hay datos
+        const originalToggle = themeBtn.click;
+        themeBtn.addEventListener('click', function() {
+            setTimeout(() => { if (rawData.length) generateAllCharts(); }, 30);
+        });
+    })();
+</script>
+</body>
+</html>
