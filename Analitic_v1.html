@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Auth Intelligence · Provectis Ciberseguridad</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet"/>
+<style>
+:root[data-theme="dark"]{
+  --bg:#04080f;--bg2:#070d1a;--bg3:#0b1424;--card:#0d1828;--card2:#111f35;
+  --border:#162440;--accent1:#00e5ff;--accent2:#7c3aed;--accent3:#f59e0b;
+  --accent4:#ff3d5a;--accent5:#10b981;--accent6:#f97316;
+  --text:#dde8f5;--text2:#8ba4c8;--text3:#4a6285;
+  --glow1:rgba(0,229,255,.12);--glow2:rgba(124,58,237,.12);
+  --grid:rgba(22,36,64,.8);--shadow:0 16px 48px rgba(0,0,0,.6);
+  --scan:rgba(0,229,255,.03);
+}
+:root[data-theme="light"]{
+  --bg:#f5f7ff;--bg2:#edf0fb;--bg3:#e2e7f8;--card:#fff;--card2:#f8faff;
+  --border:#d0d9f0;--accent1:#0284c7;--accent2:#7c3aed;--accent3:#d97706;
+  --accent4:#e11d48;--accent5:#059669;--accent6:#ea580c;
+  --text:#1a2540;--text2:#4a5f85;--text3:#8fa3c8;
+  --glow1:rgba(2,132,199,.08);--glow2:rgba(124,58,237,.08);
+  --grid:rgba(208,217,240,.7);--shadow:0 8px 32px rgba(100,130,200,.12);
+  --scan:rgba(2,132,199,.02);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;transition:background .4s,color .4s}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:repeating-linear-gradient(0deg,var(--scan) 0,var(--scan) 1px,transparent 1px,transparent 4px)}
+
+/* HEADER */
+header{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:16px 36px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:18px}
+.shield{width:44px;height:44px;background:linear-gradient(135deg,var(--accent1),var(--accent2));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 0 20px var(--glow1)}
+.brand-company{font-size:1rem;font-weight:900;letter-spacing:3px;text-transform:uppercase}
+.brand-dept{font-size:.58rem;font-family:'IBM Plex Mono',monospace;letter-spacing:2px;color:var(--accent1);text-transform:uppercase;margin-top:1px}
+.divider{width:1px;height:34px;background:var(--border)}
+.product-name{font-size:1.05rem;font-weight:700;background:linear-gradient(90deg,var(--accent1),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.product-sub{font-size:.58rem;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:2px}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.live{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:99px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);font-size:.62rem;font-family:'IBM Plex Mono',monospace;color:var(--accent5);letter-spacing:1px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent5);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:8px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:600;transition:all .2s}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--accent1);color:var(--accent1);background:var(--glow1)}
+.btn-pdf{background:linear-gradient(135deg,var(--accent2),var(--accent4));color:#fff}
+.btn-pdf:hover{transform:translateY(-1px);box-shadow:0 4px 20px var(--glow2)}
+.theme-btn{width:38px;height:38px;border-radius:9px;border:1px solid var(--border);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;color:var(--text)}
+.theme-btn:hover{border-color:var(--accent1);box-shadow:0 0 12px var(--glow1)}
+#csvInput{display:none}
+
+/* UPLOAD */
+#uploadZone{margin:48px auto;max-width:580px;border:2px dashed var(--border);border-radius:20px;padding:56px 40px;text-align:center;cursor:pointer;transition:all .3s;background:var(--card);position:relative;z-index:1}
+#uploadZone:hover,.drag-over{border-color:var(--accent1)!important;background:var(--glow1)!important;box-shadow:0 0 40px var(--glow1)}
+#uploadZone h2{font-size:1.4rem;font-weight:700;margin-bottom:10px}
+#uploadZone p{color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:.73rem;line-height:1.7}
+.hl{color:var(--accent1)}
+
+/* SECTION */
+.section-lbl{padding:22px 36px 6px;font-size:.58rem;font-family:'IBM Plex Mono',monospace;letter-spacing:3px;text-transform:uppercase;color:var(--text3);display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.section-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* KPI */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:10px 36px 0;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:16px 18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .5s both}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.kpi-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-icon{font-size:1.3rem;margin-bottom:6px}
+.kpi-val{font-size:1.8rem;font-weight:900;line-height:1;letter-spacing:-1px}
+.kpi-label{font-size:.56rem;font-family:'IBM Plex Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-top:4px}
+.kpi-sub{font-size:.7rem;color:var(--text2);margin-top:3px}
+.kpi-trend{position:absolute;top:14px;right:14px;font-size:.6rem;font-family:'IBM Plex Mono',monospace;padding:2px 7px;border-radius:6px}
+.t-up{background:rgba(16,185,129,.15);color:var(--accent5)}
+.t-dn{background:rgba(255,61,90,.15);color:var(--accent4)}
+.t-nu{background:rgba(245,158,11,.15);color:var(--accent3)}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;padding:14px 36px 0}
+.c3{grid-column:span 3}.c4{grid-column:span 4}.c5{grid-column:span 5}
+.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}
+.c9{grid-column:span 9}.c12{grid-column:span 12}
+@media(max-width:1100px){.c3,.c4,.c5,.c6,.c7,.c8,.c9{grid-column:span 12}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;transition:transform .2s,box-shadow .2s;position:relative;overflow:hidden;animation:fadeUp .5s both .1s}
+.card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent1) 40%,var(--accent2) 60%,transparent);opacity:.4}
+.card-tag{font-size:.56rem;font-family:'IBM Plex Mono',monospace;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:3px}
+.card-title{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:16px;letter-spacing:-.3px}
+
+/* HEATMAP */
+.hm-grid{display:grid;grid-template-columns:50px repeat(24,1fr);gap:2px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:.55rem;min-width:420px}
+.hm-h{color:var(--text3);text-align:center}
+.hm-l{color:var(--text3);text-align:right;padding-right:6px;white-space:nowrap}
+.hm-c{aspect-ratio:1;border-radius:3px;cursor:default;transition:transform .1s}
+.hm-c:hover{transform:scale(1.5);z-index:10;box-shadow:0 0 6px rgba(0,229,255,.5)}
+.hm-legend{display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end;font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--text3)}
+
+/* HOUR BARS */
+.hbars{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.hrow{display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:.62rem}
+.hlbl{width:34px;text-align:right;color:var(--text3)}
+.hbar{flex:1;height:7px;background:var(--bg3);border-radius:99px;overflow:hidden}
+.hfill{height:100%;border-radius:99px}
+.hcnt{width:28px;text-align:right;color:var(--text2)}
+
+/* TIMELINE */
+.tl{margin-top:4px}
+.tl-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.tl-item:last-child{border-bottom:none}
+.tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.tl-title{font-size:.78rem;font-weight:600;color:var(--text)}
+.tl-desc{font-size:.67rem;color:var(--text3);margin-top:1px;font-family:'IBM Plex Mono',monospace;line-height:1.4}
+
+/* TABLE */
+.ftable{width:100%;border-collapse:collapse;font-size:.75rem;margin-top:4px}
+.ftable th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);background:var(--card2)}
+.ftable td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+.ftable tr:last-child td{border-bottom:none}
+.ftable tr:hover td{background:var(--card2);color:var(--text)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:.58rem;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px}
+.b-fail{background:rgba(255,61,90,.12);color:var(--accent4);border:1px solid rgba(255,61,90,.25)}
+.b-warn{background:rgba(245,158,11,.12);color:var(--accent3);border:1px solid rgba(245,158,11,.25)}
+.b-ok{background:rgba(16,185,129,.12);color:var(--accent5);border:1px solid rgba(16,185,129,.25)}
+.risk-wrap{display:flex;align-items:center;gap:6px}
+.risk-bar{height:4px;border-radius:99px;background:var(--bg3);flex:1;overflow:hidden}
+.risk-fill{height:100%;border-radius:99px}
+
+/* DONUT CENTER */
+.dring{position:relative}
+.dcenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.dcval{font-size:1.5rem;font-weight:900}
+.dclbl{font-size:.52rem;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:1px}
+
+/* FOOTER */
+footer{display:flex;align-items:center;justify-content:space-between;padding:20px 36px;border-top:1px solid var(--border);position:relative;z-index:1;margin-top:24px}
+.fl{display:flex;align-items:center;gap:12px}
+.fshield{width:26px;height:26px;background:linear-gradient(135deg,var(--accent1),var(--accent2));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
+.fco{font-size:.72rem;font-weight:800;letter-spacing:2px}
+.fdept{font-size:.55rem;font-family:'IBM Plex Mono',monospace;color:var(--accent1);letter-spacing:1.5px}
+.fr{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--text3);text-align:right;line-height:1.6}
+
+/* PDF OVERLAY */
+#pdfOverlay{display:none;position:fixed;inset:0;z-index:999;background:rgba(4,8,15,.9);backdrop-filter:blur(4px);align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.pspin{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent1);border-radius:50%;animation:spin .8s linear infinite}
+.pmsg{font-family:'IBM Plex Mono',monospace;color:var(--accent1);font-size:.88rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div id="pdfOverlay"><div class="pspin"></div><div class="pmsg">Generando PDF · Por favor espera...</div></div>
+
+<header>
+  <div class="brand">
+    
+    <img src=" https://cdn.prod.website-files.com/640a13abafacbfe33988cc35/640f5c1f6613574d1d6b772c_Logo-provectis.png">
+    
+ 
+    <div><div class="product-name"> SOC - Provectis</div> <div class="product-sub">Equipo de Ciberseguridad 2026</div></div>
+  </div>
+  <div class="hdr-right">
+    <div class="live"><div class="live-dot"></div>SISTEMA ACTIVO</div>
+    <label for="csvInput" class="btn btn-ghost">📂 Cargar otro CSV</label>
+    <input type="file" id="csvInput" accept=".csv"/>
+    <button class="btn btn-pdf" id="exportPdf">⬇ Exportar PDF</button>
+    <button class="theme-btn" id="themeBtn">🌙</button>
+  </div>
+</header>
+
+<!-- UPLOAD (hidden by default since data is pre-loaded) -->
+<div id="uploadZone" style="display:none">
+  <h2>Cargar nuevo archivo</h2>
+  <p>Arrastra un CSV aquí o usa el botón <span class="hl">"Cargar otro CSV"</span> del header</p>
+</div>
+
+<div id="dashboard">
+  <div class="section-lbl">Indicadores clave de seguridad</div>
+  <div class="kpi-strip" id="kpiStrip"></div>
+
+  <div class="section-lbl" style="margin-top:6px">Análisis temporal · Volumen y calidad</div>
+  <div class="grid">
+    <div class="card c8"><div class="card-tag">Tendencia diaria</div><div class="card-title">Eventos de autenticación por día</div><canvas id="cLine" height="95"></canvas></div>
+    <div class="card c4"><div class="card-tag">Composición global</div><div class="card-title">Éxito vs Fallo total</div><div class="dring"><canvas id="cMain" height="170"></canvas><div class="dcenter" id="dcMain"></div></div></div>
+  </div>
+  <div class="grid" style="padding-top:0">
+    <div class="card c12"><div class="card-tag">Distribución horaria · UTC</div><div class="card-title">Actividad por hora del día — total vs fallos</div><canvas id="cHour" height="55"></canvas></div>
+  </div>
+
+  <div class="section-lbl" style="margin-top:0">Métodos de autenticación</div>
+  <div class="grid" style="padding-top:0">
+    <div class="card c4"><div class="card-tag">Distribución</div><div class="card-title">Métodos utilizados</div><canvas id="cMethod" height="175"></canvas></div>
+    <div class="card c4"><div class="card-tag">Capacidad MFA</div><div class="card-title">Sesiones con / sin MFA</div><div class="dring"><canvas id="cMFA" height="175"></canvas><div class="dcenter" id="dcMFA"></div></div></div>
+    <div class="card c4"><div class="card-tag">Flujo de autenticación</div><div class="card-title">Paso único vs Multi-paso</div><div class="dring"><canvas id="cSteps" height="175"></canvas><div class="dcenter" id="dcSteps"></div></div></div>
+  </div>
+
+  <div class="section-lbl" style="margin-top:0">Análisis de riesgo · Fallos y anomalías</div>
+  <div class="grid" style="padding-top:0">
+    <div class="card c6"><div class="card-tag">Razones de fallo</div><div class="card-title">Clasificación de errores</div><canvas id="cFail" height="185"></canvas></div>
+    <div class="card c6"><div class="card-tag">Tasa de éxito diaria</div><div class="card-title">Evolución con umbral 90%</div><canvas id="cRate" height="185"></canvas></div>
+  </div>
+  <div class="grid" style="padding-top:0">
+    <div class="card c8"><div class="card-tag">Mapa de calor · Día × Hora UTC</div><div class="card-title">Densidad de actividad</div><div style="overflow-x:auto"><div id="heatmap"></div></div></div>
+    <div class="card c4"><div class="card-tag">Horas críticas</div><div class="card-title">Top 10 horas con más fallos</div><div id="hourBars" class="hbars"></div></div>
+  </div>
+  <div class="grid" style="padding-top:0">
+    <div class="card c12"><div class="card-tag">Catálogo de resultados</div><div class="card-title">Desglose completo de códigos de resultado</div><canvas id="cResults" height="55"></canvas></div>
+  </div>
+
+  <div class="section-lbl" style="margin-top:0">Informe de seguridad</div>
+  <div class="grid" style="padding-top:0;padding-bottom:28px">
+    <div class="card c4"><div class="card-tag">Alertas detectadas</div><div class="card-title">Eventos de seguridad relevantes</div><div class="tl" id="timeline"></div></div>
+    <div class="card c8"><div class="card-tag">Tabla de fallos</div><div class="card-title">Mensajes de error — frecuencia y riesgo</div>
+      <table class="ftable"><thead><tr><th>#</th><th>Mensaje de error</th><th>Count</th><th>% fallos</th><th>Riesgo</th><th>Estado</th></tr></thead>
+      <tbody id="failTbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="fl"><div class="fshield"></div><div><div class="fco"> Soc - PROVECTIS</div><div class="fdept">Equipo de Ciberseguridad</div></div></div>
+  <div class="fr"> <div class="fco">Lizandro | lizandro.gomez@provectis.cl</div>   Auth Intelligence Dashboard · Generado el 13/03/2026 15:14<br/>Uso interno · Información confidencial</div>
+</footer>
+
+<script>
+/* ── EMBEDDED DATA ── */
+const D = {"by_day": {"2026-03-13": 132, "2026-03-12": 333, "2026-03-11": 574, "2026-03-10": 305, "2026-03-09": 300, "2026-03-08": 83, "2026-03-07": 27, "2026-03-06": 129}, "by_hour": {"13": 105, "12": 214, "11": 192, "10": 26, "9": 24, "8": 23, "7": 15, "3": 14, "2": 11, "1": 10, "22": 76, "21": 89, "20": 276, "19": 133, "18": 83, "17": 79, "16": 128, "15": 129, "14": 146, "0": 22, "23": 67, "5": 12, "6": 4, "4": 5}, "by_hour_fail": {"11": 6, "19": 14, "15": 13, "12": 16, "22": 11, "21": 7, "20": 23, "16": 7, "13": 8, "10": 2, "17": 10, "9": 11, "8": 12, "6": 4, "5": 11, "18": 3, "7": 3, "1": 2, "3": 5, "0": 2, "23": 3, "14": 3}, "methods": {"Previously satisfied": 1559, "Password": 272, "Mobile app notification": 27, "OATH verification code": 2, "Companion mobile app notification": 22, "Unknown": 1}, "results": {"First factor requirement satisfied by claim in the token": 1140, "MFA requirement satisfied by claim in the token": 419, "User approved": 123, "MFA completed in Azure AD": 25, "For security reasons, user confirmation is required to sign in to this tenant.": 1, "Invalid username or password or Invalid on-premise username or password.": 59, "User is unauthorized - unable to issue tokens because of version issue - issuer name is not specified - problems with issuer name (null -max length). Contact the app owner.": 1, "User account is disabled. The account has been disabled by an administrator.": 4, "MFA required in Azure AD": 8, "Authentication in progress": 18, "Authentication failed during strong authentication request.": 3, "Incorrect password": 81, "MFA denied; user declined the authentication": 1}, "fail_reasons": {"For security reasons, user confirmation is required to sign in to this tenant.": 1, "Invalid username or password or Invalid on-premise username or password.": 59, "User is unauthorized - unable to issue tokens because of version issue - issuer name is not specified - problems with issuer name (null -max length). Contact the app owner.": 1, "User account is disabled. The account has been disabled by an administrator.": 4, "MFA required in Azure AD": 8, "Authentication in progress": 18, "Authentication failed during strong authentication request.": 3, "Incorrect password": 81, "MFA denied; user declined the authentication": 1}, "by_day_sf": {"2026-03-13": {"ok": 131, "fail": 1}, "2026-03-12": {"ok": 328, "fail": 5}, "2026-03-11": {"ok": 524, "fail": 50}, "2026-03-10": {"ok": 274, "fail": 31}, "2026-03-09": {"ok": 246, "fail": 54}, "2026-03-08": {"ok": 58, "fail": 25}, "2026-03-07": {"ok": 24, "fail": 3}, "2026-03-06": {"ok": 122, "fail": 7}}, "heatmap": {"2026-03-13": {"13": 30, "12": 41, "11": 39, "10": 6, "9": 4, "8": 2, "7": 1, "3": 5, "2": 1, "1": 3}, "2026-03-12": {"22": 20, "21": 19, "20": 13, "19": 43, "18": 19, "17": 17, "16": 38, "15": 32, "14": 55, "13": 8, "12": 34, "11": 27, "10": 1, "9": 1, "1": 2, "0": 4}, "2026-03-11": {"23": 28, "22": 28, "21": 25, "20": 191, "19": 35, "18": 8, "17": 12, "16": 31, "15": 39, "14": 21, "13": 16, "12": 47, "11": 64, "10": 3, "8": 2, "7": 4, "5": 1, "3": 2, "2": 8, "0": 9}, "2026-03-10": {"22": 10, "21": 22, "20": 13, "19": 18, "18": 27, "17": 19, "16": 26, "15": 11, "14": 33, "13": 20, "12": 44, "11": 28, "10": 3, "9": 7, "8": 8, "6": 4, "5": 5, "4": 2, "1": 1, "0": 4}, "2026-03-09": {"22": 13, "21": 13, "20": 26, "19": 19, "18": 19, "17": 6, "16": 21, "15": 36, "14": 14, "13": 25, "12": 44, "11": 28, "10": 8, "9": 5, "8": 4, "7": 8, "5": 6, "4": 1, "3": 2, "1": 2}, "2026-03-08": {"23": 28, "22": 3, "20": 1, "16": 4, "15": 1, "14": 8, "13": 5, "11": 2, "10": 4, "9": 5, "8": 7, "7": 2, "4": 2, "3": 5, "1": 2, "0": 4}, "2026-03-07": {"23": 4, "22": 2, "21": 2, "18": 1, "15": 2, "14": 1, "13": 1, "12": 4, "11": 4, "10": 1, "9": 2, "2": 2, "0": 1}, "2026-03-06": {"23": 7, "21": 8, "20": 32, "19": 18, "18": 9, "17": 25, "16": 8, "15": 8, "14": 14}}, "days": ["2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13"], "total": 1883, "ok_count": 1707, "fail_count": 176, "success_rate": 90.7, "unique_sessions": 1429, "mfa_sessions": 453, "multi_step": 454, "single_step": 975, "rapid_fails": 100, "success_rates": [94.6, 88.9, 69.9, 82.0, 89.8, 91.3, 98.5, 99.2], "worst_day": "2026-03-08", "worst_rate": 69.9};
+
+/* ── THEME ── */
+let dark=true;
+const html=document.documentElement;
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  dark=!dark; html.setAttribute('data-theme',dark?'dark':'light');
+  document.getElementById('themeBtn').textContent=dark?'🌙':'☀️';
+  render(D);
+});
+const css=v=>getComputedStyle(html).getPropertyValue(v).trim();
+
+/* ── CSV RELOAD ── */
+document.getElementById('csvInput').addEventListener('change',e=>{
+  if(!e.target.files[0]) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const text=ev.target.result.replace(/^\uFEFF/,'');
+    const lines=text.split('\n').filter(l=>l.trim());
+    const headers=pLine(lines[0]);
+    const rows=lines.slice(1).map(l=>{
+      const v=pLine(l); const o={};
+      headers.forEach((h,i)=>o[h]=(v[i]||'').trim()); return o;
+    }).filter(r=>r['Date']);
+    render(processData(rows));
+  };
+  r.readAsText(e.target.files[0],'utf-8');
+});
+
+function pLine(line){
+  const res=[]; let cur='',inQ=false;
+  for(const c of line){ if(c==='"')inQ=!inQ; else if(c===','&&!inQ){res.push(cur);cur='';} else cur+=c; }
+  res.push(cur); return res;
+}
+
+function processData(rows){
+  const byDay={},byHour={},byHourFail={},methods={},results={},failReasons={},byDaySF={},heatmap={};
+  let ok=0,fail=0;
+  const reqSteps={};
+  rows.forEach(r=>{
+    const dt=new Date(r['Date']), day=dt.toISOString().slice(0,10), hour=dt.getUTCHours();
+    const method=r['Authentication method']||'Unknown', result=r['Result detail']||'';
+    const isOk=r['Succeeded']==='true', rid=r['Request ID'];
+    byDay[day]=(byDay[day]||0)+1; byHour[hour]=(byHour[hour]||0)+1;
+    methods[method]=(methods[method]||0)+1; results[result]=(results[result]||0)+1;
+    if(isOk)ok++; else{fail++;byHourFail[hour]=(byHourFail[hour]||0)+1;}
+    byDaySF[day]=byDaySF[day]||{ok:0,fail:0}; byDaySF[day][isOk?'ok':'fail']++;
+    heatmap[day]=heatmap[day]||{}; heatmap[day][hour]=(heatmap[day][hour]||0)+1;
+    if(!isOk&&result) failReasons[result]=(failReasons[result]||0)+1;
+    reqSteps[rid]=reqSteps[rid]||[]; reqSteps[rid].push(r);
+  });
+  const days=Object.keys(byDay).sort(), total=rows.length;
+  const uniqueSessions=Object.keys(reqSteps).length;
+  const mfaSessions=Object.values(reqSteps).filter(s=>s.some(x=>x['Result detail'].includes('MFA'))).length;
+  const multiStep=Object.values(reqSteps).filter(s=>s.length>1).length;
+  const failTimes=rows.filter(r=>r['Succeeded']!=='true').map(r=>new Date(r['Date'])).sort((a,b)=>a-b);
+  const rapidFails=failTimes.filter((_,i)=>i>0&&(failTimes[i]-failTimes[i-1])<60000).length;
+  const successRates=days.map(d=>{const s=byDaySF[d]||{ok:0,fail:0};return s.ok/(s.ok+s.fail)*100||0;});
+  const worstDay=days.reduce((w,d)=>{const s=byDaySF[d]||{ok:0,fail:0};return(s.ok/(s.ok+s.fail+1e-9))<((byDaySF[w]||{ok:0,fail:0}).ok/((byDaySF[w]||{ok:0,fail:1}).ok+(byDaySF[w]||{ok:0,fail:1}).fail+1e-9))?d:w;}, days[0]);
+  const wd=byDaySF[worstDay]||{ok:0,fail:0};
+  return {byDay,byHour,byHourFail,methods,results,failReasons,byDaySF,heatmap,days,total,ok_count:ok,fail_count:fail,
+    success_rate:+(ok/total*100).toFixed(1),unique_sessions:uniqueSessions,mfa_sessions:mfaSessions,
+    multi_step:multiStep,single_step:uniqueSessions-multiStep,rapid_fails:rapidFails,success_rates:successRates,
+    worst_day:worstDay,worst_rate:+(wd.ok/(wd.ok+wd.fail)*100).toFixed(1)};
+}
+
+/* ── CHART REGISTRY ── */
+const charts={};
+function mk(id,cfg){if(charts[id])charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg);}
+
+/* ── RENDER ── */
+function render(d){
+  const C1=css('--accent1'),C2=css('--accent2'),C3=css('--accent3'),C4=css('--accent4'),C5=css('--accent5'),C6=css('--accent6');
+  const TXT=css('--text3'),GRID=css('--grid'),CBG=css('--card');
+  const PAL=[C1,C2,C3,C4,C5,C6,'#a78bfa','#34d399','#fb923c','#38bdf8'];
+
+  const base={
+    responsive:true,maintainAspectRatio:true,
+    plugins:{
+      legend:{labels:{color:TXT,font:{family:'Outfit',size:11},boxWidth:11,padding:14}},
+      tooltip:{backgroundColor:css('--card2'),titleColor:css('--text'),bodyColor:TXT,
+               borderColor:css('--border'),borderWidth:1,padding:10,cornerRadius:8,
+               titleFont:{family:'Outfit',weight:'bold'},bodyFont:{family:'IBM Plex Mono',size:11}}
+    },
+    scales:{
+      x:{ticks:{color:TXT,font:{family:'IBM Plex Mono',size:10}},grid:{color:GRID},border:{color:'transparent'}},
+      y:{ticks:{color:TXT,font:{family:'IBM Plex Mono',size:10}},grid:{color:GRID},border:{color:'transparent'}}
+    }
+  };
+
+  /* KPIs */
+  const kpis=[
+    {icon:'📋',val:d.total.toLocaleString(),lbl:'Total Eventos',sub:'registros analizados',color:C1,trend:null},
+    {icon:'🔑',val:d.unique_sessions.toLocaleString(),lbl:'Sesiones Únicas',sub:'Request IDs distintos',color:C2,trend:null},
+    {icon:'✅',val:d.success_rate+'%',lbl:'Tasa de Éxito',sub:d.ok_count.toLocaleString()+' exitosas',color:C5,trend:d.success_rate>=90?'↑ BUENA':'↓ REVISAR',tc:d.success_rate>=90?'t-up':'t-dn'},
+    {icon:'❌',val:d.fail_count.toLocaleString(),lbl:'Total Fallos',sub:'autenticaciones fallidas',color:C4,trend:(d.fail_count/d.total*100).toFixed(1)+'%',tc:d.fail_count/d.total>.15?'t-dn':'t-nu'},
+    {icon:'🛡',val:d.mfa_sessions.toLocaleString(),lbl:'Sesiones MFA',sub:'de '+d.unique_sessions+' únicas',color:C3,trend:(d.mfa_sessions/d.unique_sessions*100).toFixed(0)+'%',tc:'t-nu'},
+    {icon:'⚡',val:d.rapid_fails.toLocaleString(),lbl:'Fallos Rápidos',sub:'consecutivos <60s',color:C6,trend:d.rapid_fails>50?'⚠ ALTO':'OK',tc:d.rapid_fails>50?'t-dn':'t-up'},
+    {icon:'📅',val:d.worst_day.slice(5),lbl:'Día más Crítico',sub:d.worst_rate+'% tasa de éxito',color:C4,trend:'↓ REVISAR',tc:'t-dn'},
+    {icon:'🔗',val:d.multi_step.toLocaleString(),lbl:'Sesiones Multistep',sub:d.single_step+' de un solo paso',color:C2,trend:null},
+  ];
+  document.getElementById('kpiStrip').innerHTML=kpis.map((k,i)=>`
+    <div class="kpi" style="animation-delay:${i*.05}s">
+      <div class="kpi-bar" style="background:linear-gradient(90deg,${k.color}88,${k.color}11)"></div>
+      ${k.trend?`<div class="kpi-trend ${k.tc}">${k.trend}</div>`:''}
+      <div class="kpi-icon">${k.icon}</div>
+      <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+      <div class="kpi-label">${k.lbl}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  /* Chart 1 – Line */
+  mk('cLine',{type:'line',data:{labels:d.days.map(x=>x.slice(5)),datasets:[
+    {label:'Total',data:d.days.map(day=>d.byDay[day]),borderColor:C1+'cc',backgroundColor:C1+'18',tension:.4,fill:true,pointRadius:5,pointHoverRadius:8,pointBackgroundColor:C1},
+    {label:'Exitosos',data:d.days.map(day=>(d.byDaySF[day]||{ok:0}).ok),borderColor:C5+'cc',backgroundColor:C5+'10',tension:.4,fill:true,pointRadius:3},
+    {label:'Fallidos',data:d.days.map(day=>(d.byDaySF[day]||{fail:0}).fail),borderColor:C4+'cc',backgroundColor:C4+'10',tension:.4,fill:true,pointRadius:3},
+  ]},options:{...base,interaction:{mode:'index',intersect:false}}});
+
+  /* Chart 2 – Donut main */
+  mk('cMain',{type:'doughnut',data:{labels:['Exitosos','Fallidos'],datasets:[{data:[d.ok_count,d.fail_count],backgroundColor:[C5+'cc',C4+'cc'],borderColor:[C5,C4],borderWidth:2,hoverOffset:10}]},
+    options:{...base,cutout:'68%',scales:{x:{display:false},y:{display:false}},plugins:{...base.plugins,legend:{position:'bottom',labels:{...base.plugins.legend.labels}}}}});
+  document.getElementById('dcMain').innerHTML=`<div class="dcval" style="color:${C5}">${d.success_rate}%</div><div class="dclbl">ÉXITO</div>`;
+
+  /* Chart 3 – Hourly */
+  const h24=Array.from({length:24},(_,i)=>i);
+  mk('cHour',{type:'bar',data:{labels:h24.map(h=>h+'h'),datasets:[
+    {label:'Total',data:h24.map(h=>d.byHour[h]||0),backgroundColor:C1+'55',borderColor:C1+'88',borderWidth:1,borderRadius:4,order:2},
+    {label:'Fallos',data:h24.map(h=>d.byHourFail[h]||0),backgroundColor:C4+'88',borderColor:C4,borderWidth:1,borderRadius:4,order:1},
+  ]},options:{...base,interaction:{mode:'index',intersect:false}}});
+
+  /* Chart 4 – Methods */
+  const me=Object.entries(d.methods).filter(([k])=>k&&k!=='').sort((a,b)=>b[1]-a[1]);
+  mk('cMethod',{type:'doughnut',data:{labels:me.map(([k])=>k),datasets:[{data:me.map(([,v])=>v),backgroundColor:PAL,borderColor:CBG,borderWidth:3,hoverOffset:8}]},
+    options:{...base,cutout:'50%',scales:{x:{display:false},y:{display:false}},plugins:{...base.plugins,legend:{position:'bottom',labels:{...base.plugins.legend.labels,boxWidth:10,padding:10}}}}});
+
+  /* Chart 5 – MFA donut */
+  mk('cMFA',{type:'doughnut',data:{labels:['Con MFA','Sin MFA'],datasets:[{data:[d.mfa_sessions,d.unique_sessions-d.mfa_sessions],backgroundColor:[C2+'cc',C3+'cc'],borderColor:[C2,C3],borderWidth:2,hoverOffset:8}]},
+    options:{...base,cutout:'62%',scales:{x:{display:false},y:{display:false}},plugins:{...base.plugins,legend:{position:'bottom',labels:{...base.plugins.legend.labels}}}}});
+  document.getElementById('dcMFA').innerHTML=`<div class="dcval" style="color:${C2}">${d.mfa_sessions}</div><div class="dclbl">CON MFA</div>`;
+
+  /* Chart 6 – Steps */
+  mk('cSteps',{type:'doughnut',data:{labels:['Paso único','Multi-paso'],datasets:[{data:[d.single_step,d.multi_step],backgroundColor:[C1+'99',C6+'cc'],borderColor:[C1,C6],borderWidth:2,hoverOffset:8}]},
+    options:{...base,cutout:'62%',scales:{x:{display:false},y:{display:false}},plugins:{...base.plugins,legend:{position:'bottom',labels:{...base.plugins.legend.labels}}}}});
+  document.getElementById('dcSteps').innerHTML=`<div class="dcval" style="color:${C6}">${d.multi_step}</div><div class="dclbl">MULTI</div>`;
+
+  /* Chart 7 – Fail reasons */
+  const fe=Object.entries(d.failReasons).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const sh=s=>s.length>52?s.slice(0,50)+'…':s;
+  mk('cFail',{type:'bar',data:{labels:fe.map(([k])=>sh(k)),datasets:[{label:'Ocurrencias',data:fe.map(([,v])=>v),backgroundColor:fe.map((_,i)=>PAL[i]+'cc'),borderRadius:5,borderSkipped:false}]},
+    options:{...base,indexAxis:'y',plugins:{...base.plugins,legend:{display:false}},scales:{x:{...base.scales.x},y:{...base.scales.y,ticks:{...base.scales.y.ticks,font:{family:'IBM Plex Mono',size:9}}}}}});
+
+  /* Chart 8 – Success rate */
+  mk('cRate',{type:'line',data:{labels:d.days.map(x=>x.slice(5)),datasets:[
+    {label:'Tasa éxito %',data:d.success_rates,borderColor:C5,backgroundColor:C5+'18',tension:.4,fill:true,pointRadius:6,pointHoverRadius:9,
+      pointBackgroundColor:d.success_rates.map(r=>r>=90?C5:C4),pointBorderColor:d.success_rates.map(r=>r>=90?C5:C4)},
+    {label:'Umbral 90%',data:d.days.map(()=>90),borderColor:C3+'66',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
+  ]},options:{...base,interaction:{mode:'index',intersect:false},scales:{x:{...base.scales.x},y:{...base.scales.y,min:50,max:101,ticks:{...base.scales.y.ticks,callback:v=>v+'%'}}}}});
+
+  /* Heatmap */
+  const dayOrder=[...d.days].sort();
+  const maxH=Math.max(...dayOrder.flatMap(day=>Array.from({length:24},(_,h)=>d.heatmap[day]?.[h]||0)));
+  const hmHtml=`<div class="hm-grid">
+    <div></div>${Array.from({length:24},(_,h)=>`<div class="hm-h">${h}</div>`).join('')}
+    ${dayOrder.map(day=>`<div class="hm-l">${day.slice(5)}</div>${Array.from({length:24},(_,h)=>{
+      const v=d.heatmap[day]?.[h]||0,t=v/maxH;
+      const hue=dark?180+t*40:200+t*30,sat=50+t*50,lig=dark?15+t*55:85-t*55,al=0.08+t*0.92;
+      return `<div class="hm-c" style="background:hsla(${hue},${sat}%,${lig}%,${al})" title="${day} ${h}h: ${v} eventos"></div>`;
+    }).join('')}`).join('')}
+  </div>
+  <div class="hm-legend"><span>Bajo</span><div style="display:flex;gap:2px">${Array.from({length:7},(_,i)=>{const t=i/6,hue=dark?180+t*40:200+t*30,sat=50+t*50,lig=dark?15+t*55:85-t*55;return `<div style="width:12px;height:12px;border-radius:2px;background:hsl(${hue},${sat}%,${lig}%)"></div>`;}  ).join('')}</div><span>Alto</span></div>`;
+  document.getElementById('heatmap').innerHTML=hmHtml;
+
+  /* Hour fail bars */
+  const topFH=Object.entries(d.byHourFail).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const mFH=topFH[0]?.[1]||1;
+  document.getElementById('hourBars').innerHTML=topFH.map(([h,cnt])=>`
+    <div class="hrow"><div class="hlbl">${h}:00</div>
+    <div class="hbar"><div class="hfill" style="width:${cnt/mFH*100}%;background:linear-gradient(90deg,${C4}cc,${C2}cc)"></div></div>
+    <div class="hcnt">${cnt}</div></div>`).join('');
+
+  /* Chart 10 – All results */
+  const re=Object.entries(d.results).filter(([k])=>k).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  mk('cResults',{type:'bar',data:{labels:re.map(([k])=>sh(k)),datasets:[{label:'Frecuencia',data:re.map(([,v])=>v),
+    backgroundColor:re.map(([k],i)=>k.match(/invalid|fail|denied|disabled|incorrect|unauthor/i)?C4+'99':PAL[i%PAL.length]+'99'),
+    borderRadius:5,borderSkipped:false}]},
+    options:{...base,plugins:{...base.plugins,legend:{display:false}},
+      scales:{x:{...base.scales.x,ticks:{...base.scales.x.ticks,font:{family:'IBM Plex Mono',size:9},maxRotation:22}},y:{...base.scales.y}}}});
+
+  /* Timeline */
+  const evts=[
+    {dot:C4,title:`Día más crítico: ${d.worst_day.slice(5)}`,desc:`Tasa de éxito ${d.worst_rate}% · Revisar actividad`},
+    {dot:d.rapid_fails>50?C4:C3,title:`${d.rapid_fails} fallos rápidos detectados`,desc:'Intentos consecutivos en menos de 60 segundos'},
+    {dot:C3,title:`Pico de actividad: hora ${Object.entries(d.byHour).sort((a,b)=>b[1]-a[1])[0]?.[0]}:00`,desc:`${Math.max(...Object.values(d.byHour))} eventos en la hora más activa`},
+    {dot:C5,title:`${d.mfa_sessions} sesiones con MFA activo`,desc:`${(d.mfa_sessions/d.unique_sessions*100).toFixed(0)}% de sesiones con doble factor`},
+    {dot:C2,title:`${d.multi_step} sesiones multi-paso`,desc:'Flujos con más de un método encadenado'},
+    {dot:d.success_rate>=90?C5:C4,title:`Tasa global de éxito: ${d.success_rate}%`,desc:d.success_rate>=90?'Dentro del umbral aceptable (≥90%)':'Por debajo del umbral · Atención requerida'},
+  ];
+  document.getElementById('timeline').innerHTML=evts.map(ev=>`
+    <div class="tl-item"><div class="tl-dot" style="background:${ev.dot};box-shadow:0 0 6px ${ev.dot}66"></div>
+    <div><div class="tl-title">${ev.title}</div><div class="tl-desc">${ev.desc}</div></div></div>`).join('');
+
+  /* Fail table */
+  const totalF=Object.values(d.failReasons).reduce((a,b)=>a+b,0)||1;
+  const risk=(msg,pct)=>{
+    if(msg.match(/invalid|incorrect|unauthorized/i)||pct>30) return {lbl:'CRÍTICO',cls:'b-fail',color:C4};
+    if(msg.match(/denied|disabled|failed/i)||pct>10)        return {lbl:'ALTO',   cls:'b-warn',color:C3};
+    return {lbl:'BAJO',cls:'b-ok',color:C5};
+  };
+  document.getElementById('failTbody').innerHTML=Object.entries(d.failReasons)
+    .sort((a,b)=>b[1]-a[1]).slice(0,10).map(([msg,cnt],i)=>{
+      const pct=cnt/totalF*100, r=risk(msg,pct);
+      return `<tr><td style="font-family:'IBM Plex Mono',monospace;color:var(--text3)">${i+1}</td>
+        <td style="font-size:.72rem">${msg.length>75?msg.slice(0,73)+'…':msg}</td>
+        <td style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:${r.color}">${cnt}</td>
+        <td><div class="risk-wrap"><div class="risk-bar"><div class="risk-fill" style="width:${Math.min(pct*2,100)}%;background:${r.color}88"></div></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--text3);width:36px">${pct.toFixed(1)}%</span></div></td>
+        <td><span class="badge ${r.cls}">${r.lbl}</span></td>
+        <td><span class="badge b-fail">FALLO</span></td></tr>`;
+    }).join('');
+}
+
+/* ── PDF EXPORT ── */
+document.getElementById('exportPdf').addEventListener('click',async()=>{
+  const ov=document.getElementById('pdfOverlay'); ov.style.display='flex';
+  await new Promise(r=>setTimeout(r,150));
+  const el=document.getElementById('dashboard');
+  const canvas=await html2canvas(el,{scale:1.4,backgroundColor:dark?'#04080f':'#f5f7ff',useCORS:true,logging:false});
+  const {jsPDF}=window.jspdf;
+  const pw=canvas.width,ph=canvas.height,pdfW=297,pdfH=(ph/pw)*pdfW;
+  const pdf=new jsPDF({orientation:pdfH>pdfW?'portrait':'landscape',unit:'mm',format:[pdfW,pdfH]});
+  pdf.setFillColor(dark?7:245,dark?13:247,dark?26:255);
+  pdf.rect(0,0,pdfW,12,'F');
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+  pdf.setTextColor(dark?0:26,dark?229:40,dark?255:80);
+  pdf.text('PROVECTIS · EQUIPO DE CIBERSEGURIDAD · AUTH INTELLIGENCE DASHBOARD',10,8);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(7);
+  pdf.setTextColor(120,140,160);
+  pdf.text(`Generado: ${new Date().toLocaleString('es-ES')} · Confidencial`,pdfW-10,8,{align:'right'});
+  pdf.addImage(canvas.toDataURL('image/jpeg',.92),'JPEG',0,12,pdfW,pdfH-12);
+  pdf.save(`provectis-auth-${new Date().toISOString().slice(0,10)}.pdf`);
+  ov.style.display='none';
+});
+
+/* ── AUTO-RENDER on load ── */
+render(D);
+</script>
+</body>
+</html>
